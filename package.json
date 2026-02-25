@@ -1,6 +1,6 @@
 {
   "name": "pi-minimax-tools",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MiniMax web_search and understand_image tools for pi",
   "keywords": [
     "pi",
@@ -17,7 +17,7 @@
   },
   "type": "module",
   "pi": {
-    "extensions": ["./index.ts"]
+    "extensions": ["./extensions/index.ts"]
   },
   "dependencies": {
     "@sinclair/typebox": "^0.32.0"
