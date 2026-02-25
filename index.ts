@@ -1,4 +1,9 @@
 /**
+ * SPDX-License-Identifier: EPL-2.0
+ * Copyright (c) 2026 Marko Kocic
+ */
+
+/**
  * MiniMax Tools Extension for pi
  * 
  * Provides web_search and understand_image tools using the MiniMax Coding Plan API.

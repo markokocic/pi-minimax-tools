@@ -1,10 +1,33 @@
 # MiniMax Tools for pi
 
-A pi extension that provides `web_search` and `understand_image` tools using the MiniMax Coding Plan API.
+A [pi coding agent](https://github.com/badlogic/pi-mono) extension that provides `web_search` and `understand_image` tools using the MiniMax Coding Plan API.
+
 
 ## Installation
 
-The extension is auto-discovered from `~/.pi/agent/extensions/minimax-tools/`.
+### Using pi install (recommended)
+
+**From npm:**
+```bash
+pi install npm:pi-minimax-tools
+```
+
+**From GitHub:**
+```bash
+pi install git:github.com/markokocic/pi-minimax-tools
+```
+
+### Manual Installation
+
+Copy the files to your extensions directory:
+
+```
+~/.pi/agent/extensions/pi-minimax-tools/
+```
+
+- `index.ts` - Main extension code
+
+pi will automatically load extensions from `~/.pi/agent/extensions/`.
 
 ## Configuration
 
@@ -63,3 +86,13 @@ These tools make API calls to MiniMax which may incur costs. Use only when neede
 
 - `index.ts` - Main extension code
 - `package.json` - Package configuration
+
+## License
+
+Copyright (c) 2026-present Marko Kocic
+
+This program and the accompanying materials are made available under the
+terms of the Eclipse Public License 2.0 which is available at:
+https://www.eclipse.org/legal/epl-2.0/
+
+SPDX-License-Identifier: EPL-2.0

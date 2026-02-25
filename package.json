@@ -1,7 +1,20 @@
 {
-  "name": "minimax-tools",
+  "name": "pi-minimax-tools",
   "version": "1.0.0",
   "description": "MiniMax web_search and understand_image tools for pi",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-coding-agent",
+    "extension",
+    "tools"
+  ],
+  "author": "Marko Kocic <marko@euptera.com>",
+  "license": "EPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/markokocic/pi-minimax-tools.git"
+  },
   "type": "module",
   "pi": {
     "extensions": ["./index.ts"]
