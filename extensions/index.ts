@@ -1,42 +1,27 @@
 /**
- * SPDX-License-Identifier: EPL-2.0
- * Copyright (c) 2026 Marko Kocic
- */
-
-/**
  * MiniMax Tools Extension for pi
  * 
  * Provides web_search and understand_image tools using the MiniMax Coding Plan API.
  * 
- * Configuration:
- * Set the following environment variables before starting pi:
- * - MINIMAX_API_KEY: Your MiniMax API key
- * - MINIMAX_API_HOST: API host (https://api.minimax.io for global, https://api.minimaxi.com for China)
- * 
- * Or configure via settings.json:
+ * This extension uses pi's provider system for authentication and connection.
+ * Configure MiniMax in ~/.pi/agent/models.json:
  * {
- *   "env": {
- *     "MINIMAX_API_KEY": "your-api-key",
- *     "MINIMAX_API_HOST": "https://api.minimax.io"
+ *   "providers": {
+ *     "minimax": {
+ *       "baseUrl": "https://api.minimax.io",
+ *       "apiKey": "your-api-key",
+ *       "api": "openai-completions",
+ *       "models": [...]
+ *     }
  *   }
  * }
+ * 
+ * Or use environment variable MINIMAX_API_KEY (baseUrl defaults to https://api.minimax.io)
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import * as nodefs from "node:fs";
-import * as nodePath from "node:path";
-import * as os from "node:os";
-
-interface AuthConfig {
-  [provider: string]: {
-    type: string;
-    key?: string;
-    access?: string;
-    refresh?: string;
-    expires?: number;
-  };
-}
 
 interface SearchResult {
   title: string;
@@ -59,81 +44,6 @@ interface VLMResponse {
   base_resp: {
     status_code: number;
     status_msg: string;
-  };
-}
-
-function getAuthConfig(): AuthConfig | null {
-  try {
-    const authPath = nodePath.join(os.homedir(), ".pi", "agent", "auth.json");
-    if (!nodefs.existsSync(authPath)) {
-      return null;
-    }
-    const content = nodefs.readFileSync(authPath, "utf-8");
-    return JSON.parse(content);
-  } catch (error) {
-    console.warn("[minimax-tools] Failed to read auth.json:", error);
-    return null;
-  }
-}
-
-function getApiKey(): string | null {
-  const auth = getAuthConfig();
-  if (auth?.minimax?.key) {
-    return auth.minimax.key;
-  }
-  return null;
-}
-
-function getApiHost(): string {
-  // Check environment variable first for override
-  if (process.env.MINIMAX_API_HOST) {
-    return process.env.MINIMAX_API_HOST;
-  }
-  // Default to global host
-  return "https://api.minimax.io";
-}
-
-function getApiClient() {
-  const apiKey = getApiKey();
-  const apiHost = getApiHost();
-  
-  if (!apiKey) {
-    throw new Error("MiniMax API key not found. Please add your minimax API key to ~/.pi/agent/auth.json or set the MINIMAX_API_KEY environment variable.");
-  }
-  
-  return {
-    apiKey,
-    apiHost,
-    async post<T>(endpoint: string, body: Record<string, unknown>): Promise<T> {
-      const url = `${apiHost}${endpoint}`;
-      
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "MM-API-Source": "pi-extension"
-        },
-        body: JSON.stringify(body)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json() as T;
-      
-      // Check API-specific errors
-      const baseResp = (data as Record<string, unknown>).base_resp as { status_code: number; status_msg: string } | undefined;
-      if (baseResp && baseResp.status_code !== 0) {
-        if (baseResp.status_code === 1004) {
-          throw new Error(`API Error: ${baseResp.status_msg}. Please check your API key and API host.`);
-        }
-        throw new Error(`API Error: ${baseResp.status_code} - ${baseResp.status_msg}`);
-      }
-      
-      return data;
-    }
   };
 }
 
@@ -202,23 +112,13 @@ async function fetchImageAsBase64(url: string): Promise<string> {
 }
 
 export default function (pi: ExtensionAPI) {
-  // Check for API configuration on load
-  const apiKey = getApiKey();
-  const apiHost = getApiHost();
-  
-  if (!apiKey) {
-    console.warn("[minimax-tools] MiniMax API key not found in ~/.pi/agent/auth.json. Tools will fail until configured.");
-  }
-  
-  // Show configuration info
-  console.log(`[minimax-tools] MiniMax tools loaded. API Host: ${apiHost}`);
-
   // MiniMax-specific tools - only active when using minimax provider
   const MINIMAX_TOOLS = ["web_search", "understand_image"];
 
   function updateToolAvailability(provider: string) {
+    const isMinimaxProvider = provider === "minimax" || provider === "minimax-cn";
     const currentTools = pi.getActiveTools();
-    if (provider === "minimax") {
+    if (isMinimaxProvider) {
       // Enable minimax tools if not already active
       const newTools = [...new Set([...currentTools, ...MINIMAX_TOOLS])];
       pi.setActiveTools(newTools);
@@ -242,6 +142,96 @@ export default function (pi: ExtensionAPI) {
   pi.on("model_select", async (event) => {
     updateToolAvailability(event.model.provider);
   });
+
+  // Helper to create API client from extension context
+  function getApiClient(ctx: ExtensionContext) {
+    const model = ctx.model;
+    if (!model) {
+      throw new Error("No model selected. Please select a MiniMax model.");
+    }
+    
+    // Get API key from the model's provider configuration
+    const apiKeyPromise = ctx.modelRegistry.getApiKey(model);
+    
+    // For synchronous access, we need to handle this differently in the tool
+    // The tool execution is async so we can await the API key
+    
+    return {
+      async getApiKey(): Promise<string> {
+        const apiKey = await apiKeyPromise;
+        if (!apiKey) {
+          throw new Error(`No API key configured for ${model.provider}. Please add your MiniMax API key to ~/.pi/agent/models.json or set the MINIMAX_API_KEY environment variable.`);
+        }
+        return apiKey;
+      },
+      getBaseUrl(): string {
+        // Use the model's baseUrl, with fallback to default MiniMax endpoint
+        // The baseUrl from models.json typically includes /v1
+        // If no custom model is defined, model.baseUrl might be undefined
+        return model.baseUrl || process.env.MINIMAX_API_HOST || "https://api.minimax.io";
+      },
+      getProvider(): string {
+        return model.provider;
+      },
+      
+      async post<T>(endpoint: string, body: Record<string, unknown>): Promise<T> {
+        const apiKey = await this.getApiKey();
+        let baseUrl = this.getBaseUrl();
+        
+        // Remove trailing slash if present
+        if (baseUrl.endsWith("/")) {
+          baseUrl = baseUrl.slice(0, -1);
+        }
+        
+        // The minimax provider may have different baseUrl formats:
+        // - https://api.minimax.io/anthropic (Anthropic-compatible) -> use /v1
+        // - https://api.minimax.io/v1 (standard OpenAI-compatible) -> use as-is
+        // - https://api.minimaxi.com (China) -> use /v1
+        // 
+        // The coding_plan endpoints are at /v1/coding_plan/...
+        // So we need to normalize: use /v1 prefix
+        let normalizedBase: string;
+        if (baseUrl.includes("/anthropic")) {
+          // Replace /anthropic with /v1
+          normalizedBase = baseUrl.replace("/anthropic", "/v1");
+        } else if (baseUrl.includes("/v1")) {
+          normalizedBase = baseUrl;
+        } else {
+          // Add /v1
+          normalizedBase = `${baseUrl}/v1`;
+        }
+        
+        const url = `${normalizedBase}${endpoint}`;
+        
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "MM-API-Source": "pi-extension"
+          },
+          body: JSON.stringify(body)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json() as T;
+        
+        // Check API-specific errors
+        const baseResp = (data as Record<string, unknown>).base_resp as { status_code: number; status_msg: string } | undefined;
+        if (baseResp && baseResp.status_code !== 0) {
+          if (baseResp.status_code === 1004) {
+            throw new Error(`API Error: ${baseResp.status_msg}. Please check your API key and API host.`);
+          }
+          throw new Error(`API Error: ${baseResp.status_code} - ${baseResp.status_msg}`);
+        }
+        
+        return data;
+      }
+    };
+  }
   
   // Register web_search tool
   pi.registerTool({
@@ -276,9 +266,9 @@ A JSON object containing:
       }
       
       try {
-        const client = getApiClient();
+        const client = getApiClient(ctx);
         
-        const response = await client.post<SearchResponse>("/v1/coding_plan/search", {
+        const response = await client.post<SearchResponse>("/coding_plan/search", {
           q: query
         });
         
@@ -369,7 +359,7 @@ A text description of the image analysis result.`,
       }
       
       try {
-        const client = getApiClient();
+        const client = getApiClient(ctx);
         
         // Process the image source
         let processedImageUrl: string;
@@ -382,7 +372,7 @@ A text description of the image analysis result.`,
           processedImageUrl = processImageUrl(image_source);
         }
         
-        const response = await client.post<VLMResponse>("/v1/coding_plan/vlm", {
+        const response = await client.post<VLMResponse>("/coding_plan/vlm", {
           prompt: prompt,
           image_url: processedImageUrl
         });
@@ -414,9 +404,4 @@ A text description of the image analysis result.`,
       }
     },
   });
-
-  // Notify about configuration status
-  if (apiKey) {
-    console.log(`[minimax-tools] MiniMax tools loaded. API Host: ${apiHost}`);
-  }
 }
