@@ -20,6 +20,8 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { keyHint } from "@mariozechner/pi-coding-agent";
+import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import * as nodefs from "node:fs";
 
@@ -313,6 +315,49 @@ A JSON object containing:
         };
       }
     },
+
+    renderCall(args, theme) {
+      let text = theme.fg("toolTitle", theme.bold("🌐 web_search "));
+      text += theme.fg("accent", `"${args.query}"`);
+      return new Text(text, 0, 0);
+    },
+
+    renderResult(result, { expanded, isPartial }, theme) {
+      // Handle streaming/partial results
+      if (isPartial) {
+        return new Text(theme.fg("warning", "Searching..."), 0, 0);
+      }
+
+      // Handle errors
+      if (result.isError || result.details?.error) {
+        const errorMsg = result.details?.error || "Search failed";
+        return new Text(theme.fg("error", `Error: ${errorMsg}`), 0, 0);
+      }
+
+      // Build result display
+      const details = result.details as { query: string; resultCount: number } | undefined;
+      let text = theme.fg("success", "✓ Search complete");
+      
+      if (details?.resultCount !== undefined) {
+        text += theme.fg("dim", ` (${details.resultCount} results)`);
+      }
+
+      // In expanded view, show all results
+      if (expanded) {
+        const content = result.content[0];
+        if (content?.type === "text") {
+          const lines = content.text.split("\n");
+          for (const line of lines) {
+            text += `\n${theme.fg("dim", line)}`;
+          }
+        }
+      } else if (details?.resultCount !== undefined) {
+        // In collapsed view, show hint for expanding
+        text += ` ${theme.fg("muted", `(${keyHint("expandTools", "to expand")})`)}`;
+      }
+
+      return new Text(text, 0, 0);
+    },
   });
 
   // Register understand_image tool
@@ -402,6 +447,48 @@ A text description of the image analysis result.`,
           details: { error: errorMessage }
         };
       }
+    },
+
+    renderCall(args, theme) {
+      let text = theme.fg("toolTitle", theme.bold("🖼️ understand_image "));
+      text += theme.fg("muted", `"${args.prompt.substring(0, 50)}"`);
+      if (args.prompt.length > 50) {
+        text += theme.fg("muted", "...");
+      }
+      text += " " + theme.fg("dim", args.image_source);
+      return new Text(text, 0, 0);
+    },
+
+    renderResult(result, { expanded, isPartial }, theme) {
+      // Handle streaming/partial results
+      if (isPartial) {
+        return new Text(theme.fg("warning", "Analyzing image..."), 0, 0);
+      }
+
+      // Handle errors
+      if (result.isError || result.details?.error) {
+        const errorMsg = result.details?.error || "Image analysis failed";
+        return new Text(theme.fg("error", `Error: ${errorMsg}`), 0, 0);
+      }
+
+      // Build result display
+      let text = theme.fg("success", "✓ Image analyzed");
+
+      // In expanded view, show all analysis content
+      if (expanded) {
+        const content = result.content[0];
+        if (content?.type === "text") {
+          const lines = content.text.split("\n");
+          for (const line of lines) {
+            text += `\n${theme.fg("dim", line)}`;
+          }
+        }
+      } else {
+        // In collapsed view, show hint for expanding
+        text += ` ${theme.fg("muted", `(${keyHint("expandTools", "to expand")})`)}`;
+      }
+
+      return new Text(text, 0, 0);
     },
   });
 }
