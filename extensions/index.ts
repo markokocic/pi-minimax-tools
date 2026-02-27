@@ -335,7 +335,7 @@ A JSON object containing:
       }
 
       // Build result display
-      const details = result.details as { query: string; resultCount: number } | undefined;
+      const details = result.details as { query: string; resultCount: number; rawResponse?: SearchResponse } | undefined;
       let text = theme.fg("success", "✓ Search complete");
       
       if (details?.resultCount !== undefined) {
@@ -350,6 +350,16 @@ A JSON object containing:
           for (const line of lines) {
             text += `\n${theme.fg("dim", line)}`;
           }
+        }
+      } else if (details?.rawResponse?.organic) {
+        // In collapsed view, show headlines
+        for (const result of details.rawResponse.organic) {
+          text += `\n${theme.fg("dim", "• " + result.title)}`;
+        }
+        if (details.resultCount! > 5) {
+          text += `\n${theme.fg("muted", `... (${keyHint("expandTools", "to expand")})`)}`;
+        } else {
+          text += ` ${theme.fg("muted", `(${keyHint("expandTools", "to expand")})`)}`;
         }
       } else if (details?.resultCount !== undefined) {
         // In collapsed view, show hint for expanding
@@ -484,7 +494,12 @@ A text description of the image analysis result.`,
           }
         }
       } else {
-        // In collapsed view, show hint for expanding
+        // In collapsed view, show brief snippet
+        const content = result.content[0];
+        if (content?.type === "text" && content.text) {
+          const snippet = content.text.substring(0, 100).replace(/\n/g, " ");
+          text += `\n${theme.fg("dim", snippet + "...")}`;
+        }
         text += ` ${theme.fg("muted", `(${keyHint("expandTools", "to expand")})`)}`;
       }
 
