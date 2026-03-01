@@ -336,11 +336,7 @@ A JSON object containing:
 
       // Build result display
       const details = result.details as { query: string; resultCount: number; rawResponse?: SearchResponse } | undefined;
-      let text = theme.fg("success", "✓ Search complete");
-      
-      if (details?.resultCount !== undefined) {
-        text += theme.fg("dim", ` (${details.resultCount} results)`);
-      }
+      let text = "";
 
       // In expanded view, show all results
       if (expanded) {
@@ -352,18 +348,17 @@ A JSON object containing:
           }
         }
       } else if (details?.rawResponse?.organic) {
-        // In collapsed view, show headlines
-        for (const result of details.rawResponse.organic) {
-          text += `\n${theme.fg("dim", "• " + result.title)}`;
+        // In compact view, show first 5 organic result titles
+        const results = details.rawResponse.organic.slice(0, 5);
+        for (const r of results) {
+          text += `\n${theme.fg("dim", "• " + r.title)}`;
         }
         if (details.resultCount! > 5) {
           text += `\n${theme.fg("muted", `... (${keyHint("expandTools", "to expand")})`)}`;
-        } else {
-          text += ` ${theme.fg("muted", `(${keyHint("expandTools", "to expand")})`)}`;
         }
       } else if (details?.resultCount !== undefined) {
-        // In collapsed view, show hint for expanding
-        text += ` ${theme.fg("muted", `(${keyHint("expandTools", "to expand")})`)}`;
+        // In compact view, show hint for expanding
+        text += theme.fg("muted", `(${keyHint("expandTools", "to expand")})`);
       }
 
       return new Text(text, 0, 0);
