@@ -152,19 +152,17 @@ export default function (pi: ExtensionAPI) {
       throw new Error("No model selected. Please select a MiniMax model.");
     }
     
-    // Get API key from the model's provider configuration
-    const apiKeyPromise = ctx.modelRegistry.getApiKey(model);
-    
-    // For synchronous access, we need to handle this differently in the tool
-    // The tool execution is async so we can await the API key
-    
     return {
       async getApiKey(): Promise<string> {
-        const apiKey = await apiKeyPromise;
-        if (!apiKey) {
+        // Get API key from the model's provider configuration
+        const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+        if (!auth.ok) {
           throw new Error(`No API key configured for ${model.provider}. Please add your MiniMax API key to ~/.pi/agent/models.json or set the MINIMAX_API_KEY environment variable.`);
         }
-        return apiKey;
+        if (!auth.apiKey) {
+          throw new Error(`No API key configured for ${model.provider}. Please add your MiniMax API key to ~/.pi/agent/models.json or set the MINIMAX_API_KEY environment variable.`);
+        }
+        return auth.apiKey;
       },
       getBaseUrl(): string {
         // Use the model's baseUrl, with fallback to default MiniMax endpoint
