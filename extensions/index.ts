@@ -124,12 +124,10 @@ export default function (pi: ExtensionAPI) {
       // Enable minimax tools if not already active
       const newTools = [...new Set([...currentTools, ...MINIMAX_TOOLS])];
       pi.setActiveTools(newTools);
-      console.log(`[minimax-tools] Enabled minimax-specific tools: ${MINIMAX_TOOLS.join(", ")}`);
     } else {
       // Disable minimax tools
       const newTools = currentTools.filter(t => !MINIMAX_TOOLS.includes(t));
       pi.setActiveTools(newTools);
-      console.log(`[minimax-tools] Disabled minimax-specific tools (using ${provider} provider)`);
     }
   }
 
