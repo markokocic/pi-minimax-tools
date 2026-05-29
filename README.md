@@ -1,5 +1,12 @@
 # MiniMax Tools for pi
 
+> **This extension is complete.**
+>
+> This extension is final for the following reasons:
+> - It is feature-complete — all intended functionality is implemented.
+> - There is nothing left to develop.
+> - The author no longer has access to a MiniMax Token Plan.
+
 Provides `web_search` and `understand_image` tools via MiniMax Coding Plan API.
 
 ## Installation
